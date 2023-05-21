@@ -28,18 +28,18 @@ const verifyJWT = (req, res, next) => {
     console.log('Hitting verify JWT');
     console.log(req.headers.authorization);
     const authorization = req.headers.authorization;
-    if(!authorization){
-        return res.status(401).send({error: true, message: 'unauthorized access'});
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' });
     }
     const token = authorization.split(' ')[1];
     console.log('Token inside Verify JWT', token);
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) =>{
-        if(error){
-            return res.status(403).send({error: true, message: 'unauthorized access'})
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if (error) {
+            return res.status(403).send({ error: true, message: 'unauthorized access' })
         }
         req.decoded = decoded;
         next();
-    } )
+    })
 }
 
 
@@ -47,24 +47,42 @@ const verifyJWT = (req, res, next) => {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const serviceCollection = client.db('carDoctor').collection('services');
         const bookingCollection = client.db('carDoctor').collection('bookings');
-        
+
         // jwt
-        app.post('/jwt', (req, res) =>{
+        app.post('/jwt', (req, res) => {
             const user = req.body;
             console.log(user);
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h'});
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
             console.log(token);
-            res.send({token});
+            res.send({ token });
         })
 
 
         // Services Routes
         app.get('/services', async (req, res) => {
-            const cursor = serviceCollection.find();
+            const sort = req.query.sort; // receiving the query value sort from client
+            const search = req.query.search; // receiving the query value search from client
+            // const query = {};
+            // query for price that have a range less than grater then value
+            // const query = { price: { $gte: 5 , $lte: 500} };
+
+            // Search the text from the database field
+            // db.InspirationalWomen.find({first_name: "Harriet"}).explain("executionStats")
+            const query = {title: { $regex: search, $options: 'i'}}
+
+
+            const options = {
+                // sort matched documents with condition by value from client in ascending  / descending order by rating
+                sort: {
+                    "price": sort === 'asc' ? 1 : -1
+                },
+            };
+
+            const cursor = serviceCollection.find(query, options);
             const result = await cursor.toArray();
             res.send(result);
         })
@@ -85,8 +103,8 @@ async function run() {
             const decoded = req.decoded;
             console.log('came back after verify', decoded);
 
-            if(decoded.email !== req.query.email){
-                return res.status(403).send({error: true, message: 'forbidden access'})
+            if (decoded.email !== req.query.email) {
+                return res.status(403).send({ error: true, message: 'forbidden access' })
             }
 
             // to get some data with condition
